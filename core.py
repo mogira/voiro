@@ -117,16 +117,17 @@ def normVoiroName(name : str):
 		'弦巻マキ': 'maki',
 		'月読アイ': 'anzu'
 	}
-        name_list = [
-                "nozomi", "seiji", "akari", "anzu",
-                "hiroshi", "kaho", "koutarou", "maki",
-                "nanako", "osamu", "sumire"
-        ]
+	name_list = [
+		"nozomi", "seiji", "akari",
+		"anzu", "hiroshi", "kaho",
+		"koutarou", "maki", "nanako",
+		"osamu", "sumire"
+	]
 	try:
 		return conv_list[name]
 	except KeyError:
 		pass
-        if name in name_list:
+	if name in name_list:
 		return name
 	raise ValueError('"%s" is not in' % name)
 
