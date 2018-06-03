@@ -112,16 +112,21 @@ class VoiroVoice:
 
 
 def normVoiroName(name : str):
-	d = {
+	conv_list = {
 		'結月ゆかり': 'sumire',
 		'弦巻マキ': 'maki',
 		'月読アイ': 'anzu'
 	}
+        name_list = [
+                "nozomi", "seiji", "akari", "anzu",
+                "hiroshi", "kaho", "koutarou", "maki",
+                "nanako", "osamu", "sumire"
+        ]
 	try:
-		return d[name]
+		return conv_list[name]
 	except KeyError:
 		pass
-	if name in d.values():
+        if name in name_list:
 		return name
 	raise ValueError('"%s" is not in' % name)
 
