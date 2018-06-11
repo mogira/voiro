@@ -1,6 +1,7 @@
 import requests, copy
 import datetime, os
 import tempfile, wave, time
+from abc import ABC, abstractmethod
 
 try:
 	import objc_util
@@ -13,12 +14,23 @@ else:
 
 
 
+class WavPlayer(ABC):
+	@abstractmethod
+	def setFilePath(self, fpath : str):
+		pass
+
+	@abstractmethod
+	def play(self, blocking : bool):
+		pass
+
+
 class VoiroVoice:
 	def __init__(
 		self,
 		name : str,
 		text : str,
 		api_key : str,
+		player : WavPlayer,
 		pitch : float = 1.0,
 		range : float = 1.0,
 		rate : float = 1.0,
@@ -26,6 +38,7 @@ class VoiroVoice:
 		auto_strip : bool = True
 	):
 		self.api_key = api_key
+		self.player = player
 		self.name = normVoiroName(name)
 		self.text = text
 		self.ssml = (
@@ -64,14 +77,16 @@ class VoiroVoice:
 
 	def play(
 		self,
-		blocking : bool = True
+		blocking : bool = True,
+		sleep_rate : float = 0.1
 	):
 		with tempfile.NamedTemporaryFile(suffix='.wav') as tmpf:
 			save_as_wav(
 				tmpf.name,
 				self.getData()
 			)
-			play_wav(tmpf.name, blocking=blocking)
+			self.player.setFilePath(tmpf.name)
+			self.player.play(blocking, sleep_rate)
 
 	def save(
 		self,
@@ -142,23 +157,9 @@ def save_as_wav(
 ):
 	with wave.open(fpath, 'w') as w:
 		w.setnchannels(1) #monoral only
-		w.setsampwidth(2) #16bit=2byte
+		w.setsampwidth(2) #16bit = 2byte
 		w.setframerate(16000)
 		w.writeframes(data)
-
-
-def play_wav(
-	fname : str,
-	blocking : bool = True
-):
-	if use_pythonista:
-		p = objc_util.ObjCClass('AVPlayer').playerWithURL_(objc_util.nsurl(fname))
-		duration = (lambda x: x.a / x.b)(p.currentItem().asset().duration())
-		p.play()
-		if blocking:
-			time.sleep(duration)
-	else:
-		print('Not implemented')
 
 
 def request_with_ssml(
@@ -197,20 +198,21 @@ def request_with_ssml(
 
 
 def main():
+	import players.pythonista
 	api_key = 'YOUR_API_KEY'
+	player = players.pythonista.AVPlayer()
 	v = VoiroVoice(
 		'結月ゆかり',
-		'ゆかりさんのテストです、心して聞きなさい。',
-		api_key,
+		'発声テストです。',
+		'7634696a5731783245647572797767516f4a502e4e6252617770656a773832494e4b62742f2e3576417138',
+		player,
 		pitch = 1.1,
 		range = 1.3,
 		rate = 1.2
 	)
 	v.request()
 	v.play(blocking = False)
-	print()
-	return v
 
 if __name__ == '__main__':
-	v = main()
+	main()
 
