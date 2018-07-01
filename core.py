@@ -1,27 +1,54 @@
 import requests, copy
 import datetime, os
 import tempfile, wave, time
-from abc import ABC, abstractmethod
-
-try:
-	import objc_util
-except ImportError:
-	use_pythonista = False
-except:
-	raise
-else:
-	use_pythonista = True
+from concurrent import futures
 
 
+class VoiroVoiceQueue:
+	def __init__(
+		self,
+		name : str,
+		api_key : str,
+		executor : futures.Executor,
+		player_class : type,
+		pitch : float = 1.0,
+		range : float = 1.0,
+		rate : float = 1.0,
+		volume : float = 2.0 #volume=1.0 is too small!!
+	):
+		lc = locals()
+		for a in [
+			'name', 'api_key',
+			'executor', 'player_class',
+			'pitch', 'range', 'rate',
+			'volume'
+		]:
+			setattr(self, a, lc[a])
+		self.list = []
 
-class WavPlayer(ABC):
-	@abstractmethod
-	def setFilePath(self, fpath : str):
-		pass
+	def push(self, text : str):
+		v = VoiroVoice(
+			name = self.name,
+			text = text,
+			api_key = self.api_key,
+			player_class = self.player_class,
+			pitch = self.pitch,
+			range = self.range,
+			rate = self.rate,
+			volume = self.volume
+		)
+		self.list.append(
+			self.executor.submit(v.request)
+		)
 
-	@abstractmethod
-	def play(self, blocking : bool):
-		pass
+	def play_all(
+		self,
+		blocking : bool = True,
+		sleep_rate : float = 0.1
+	):
+		for s in self.list:
+			vv = s.result()
+			vv.play(blocking, sleep_rate)
 
 
 class VoiroVoice:
@@ -30,15 +57,14 @@ class VoiroVoice:
 		name : str,
 		text : str,
 		api_key : str,
-		player : WavPlayer,
+		player_class : type,
 		pitch : float = 1.0,
 		range : float = 1.0,
 		rate : float = 1.0,
-		volume : float = 1.0,
-		auto_strip : bool = True
+		volume : float = 2.0 #volume=1.0 is too small!!
 	):
 		self.api_key = api_key
-		self.player = player
+		self.player = player_class()
 		self.name = normVoiroName(name)
 		self.text = text
 		self.ssml = (
@@ -58,7 +84,6 @@ class VoiroVoice:
 		) % (
 			self.name, pitch, range, rate, volume, text
 		)
-		self.auto_strip = auto_strip
 
 	def request(self):
 		data = self.convert_audioL16_to_PCM(
@@ -67,13 +92,15 @@ class VoiroVoice:
 					self.api_key,
 					self.ssml
 		)))
-		if self.auto_strip:
-			data = self.strip(data)
+		data = self.strip(data)
 		self.data = data
 		return self
 
 	def getData(self):
 		return bytes(self.data)
+
+	def isDone(self):
+		return self.player.isDone()
 
 	def play(
 		self,
@@ -123,7 +150,6 @@ class VoiroVoice:
 		while data[l] == 0:
 			l -= 1
 		return data[:l]
-
 
 
 def normVoiroName(name : str):
@@ -198,21 +224,36 @@ def request_with_ssml(
 
 
 def main():
-	import players.pythonista
 	api_key = 'YOUR_API_KEY'
-	player = players.pythonista.AVPlayer()
-	v = VoiroVoice(
+
+	vv = VoiroVoice(
 		'結月ゆかり',
 		'発声テストです。',
-		'7634696a5731783245647572797767516f4a502e4e6252617770656a773832494e4b62742f2e3576417138',
-		player,
+		api_key,
+		AVAudioPlayer,
 		pitch = 1.1,
 		range = 1.3,
 		rate = 1.2
 	)
-	v.request()
-	v.play(blocking = False)
+	vv.request()
+	vv.play(blocking = True)
+
+	vvq = VoiroVoiceQueue(
+		'結月ゆかり',
+		api_key,
+		futures.ThreadPoolExecutor(),
+		AVAudioPlayer,
+		pitch = 1.1,
+		range = 1.3,
+		rate = 1.2
+	)
+	vvq.push('発声テストです')
+	vvq.push('テストテスト')
+	vvq.push('test_text')
+	vvq.play_all(blocking = True)
+	
 
 if __name__ == '__main__':
+	from players.pythonista import AVAudioPlayer
 	main()
 
